@@ -25,7 +25,11 @@ app.use(
     maxAge: 12 * 60 * 60 * 1000, // 12 hours
     sameSite: 'lax',
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
+    // Only mark the cookie Secure once the site is actually served over HTTPS
+    // (a real domain + certbot) -- browsers silently refuse to store/send a
+    // Secure cookie over plain HTTP, which otherwise makes login look like it
+    // "fails" on every next request even though it succeeded.
+    secure: process.env.COOKIE_SECURE === 'true'
   })
 );
 

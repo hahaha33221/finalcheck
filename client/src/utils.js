@@ -1,3 +1,22 @@
+const LS_PREFIX = 'mdboard.';
+
+export function readLS(key, fallback) {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    return raw === null ? fallback : JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeLS(key, value) {
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify(value));
+  } catch {
+    /* private mode / storage disabled: fine to no-op */
+  }
+}
+
 export const fold = (s) =>
   s
     .normalize('NFD')

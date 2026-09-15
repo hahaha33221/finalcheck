@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, subscribeState } from './api.js';
-import { parseTicket, hms } from './utils.js';
+import { parseTicket, hms, readLS, writeLS } from './utils.js';
 import Header from './components/Header.jsx';
 import BusTabs from './components/BusTabs.jsx';
 import ViewTabs from './components/ViewTabs.jsx';
@@ -24,11 +24,19 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [liveStatus, setLiveStatus] = useState('connecting'); // connecting | live | polling | offline
 
-  const [curBus, setCurBus] = useState(1);
-  const [view, setView] = useState('roster');
-  const [fGroup, setFGroup] = useState(0);
-  const [fState, setFState] = useState('all');
-  const [query, setQuery] = useState('');
+  // Restored from this browser's last visit so a refresh (or the login-modal
+  // page reload) lands back on the same bus/view/filter instead of resetting.
+  const [curBus, setCurBus] = useState(() => readLS('curBus', 1));
+  const [view, setView] = useState(() => readLS('view', 'roster'));
+  const [fGroup, setFGroup] = useState(() => readLS('fGroup', 0));
+  const [fState, setFState] = useState(() => readLS('fState', 'all'));
+  const [query, setQuery] = useState(() => readLS('query', ''));
+
+  useEffect(() => writeLS('curBus', curBus), [curBus]);
+  useEffect(() => writeLS('view', view), [view]);
+  useEffect(() => writeLS('fGroup', fGroup), [fGroup]);
+  useEffect(() => writeLS('fState', fState), [fState]);
+  useEffect(() => writeLS('query', query), [query]);
 
   const [flashId, setFlashId] = useState(null);
   const [toastText, setToastText] = useState('');
