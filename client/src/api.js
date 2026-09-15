@@ -77,6 +77,7 @@ export const api = {
 export function subscribeState(onState, onStatus) {
   let closed = false;
   let pollTimer = null;
+  let watchdogTimer = null;
   let es = null;
 
   function startPolling() {
@@ -100,16 +101,33 @@ export function subscribeState(onState, onStatus) {
     pollTimer = null;
   }
 
+  // The server sends a named `ping` event roughly every 20s on top of real
+  // `state` events. Some proxies/tunnels can leave a connection open while
+  // silently dropping frames -- that never fires EventSource's onerror, so
+  // relying on onerror alone can leave a tab stuck "live" but frozen. Treat
+  // any gap longer than the ping interval as a stall and fail over to polling.
+  function resetWatchdog() {
+    clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(() => startPolling(), 40000);
+  }
+
   try {
     es = new EventSource(BASE + '/events');
+    resetWatchdog();
     es.addEventListener('state', (e) => {
       try {
         onState(JSON.parse(e.data));
         onStatus && onStatus('live');
+        resetWatchdog();
         stopPolling();
       } catch {
         /* ignore malformed frame */
       }
+    });
+    es.addEventListener('ping', () => {
+      onStatus && onStatus('live');
+      resetWatchdog();
+      stopPolling();
     });
     es.onerror = () => {
       // EventSource retries on its own; fall back to polling in the meantime
@@ -123,6 +141,7 @@ export function subscribeState(onState, onStatus) {
   return () => {
     closed = true;
     stopPolling();
+    clearTimeout(watchdogTimer);
     es && es.close();
   };
 }

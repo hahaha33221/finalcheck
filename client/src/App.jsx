@@ -114,8 +114,16 @@ export default function App() {
     async (fn) => {
       setSaving(true);
       try {
-        await fn();
-        return { ok: true };
+        const data = await fn();
+        // Apply the fresh state the write response carries right away, rather
+        // than waiting on the SSE broadcast to loop back to this same tab --
+        // the requester's own view should never depend on that round trip.
+        if (data && data.state) {
+          setT(data.state.t);
+          setD(data.state.d);
+          setUpdatedAt(data.state.u);
+        }
+        return { ok: true, data };
       } catch (err) {
         if (err.status === 401) {
           api.clearSession();

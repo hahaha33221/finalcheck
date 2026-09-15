@@ -10,9 +10,12 @@ export function sseHandler(req, res) {
   res.write('retry: 3000\n\n');
   clients.add(res);
 
+  // A named event (not just a `:` comment) so the client can tell "connection
+  // alive, nothing changed" apart from "connection silently stalled" -- some
+  // proxies/tunnels stop forwarding frames without ever firing onerror.
   const heartbeat = setInterval(() => {
-    res.write(': ping\n\n');
-  }, 25000);
+    res.write('event: ping\ndata: {}\n\n');
+  }, 20000);
 
   req.on('close', () => {
     clearInterval(heartbeat);
