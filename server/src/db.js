@@ -20,6 +20,10 @@ db.exec(`
     bus INTEGER PRIMARY KEY,
     departed_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    expires_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
