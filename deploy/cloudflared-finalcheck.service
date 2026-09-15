@@ -1,0 +1,20 @@
+[Unit]
+Description=Cloudflare quick tunnel exposing the finalcheck board over HTTPS
+After=network.target nginx.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --url http://localhost:80
+Restart=on-failure
+RestartSec=5
+# NOTE: a quick tunnel (no Cloudflare account/domain) gets a NEW random
+# trycloudflare.com hostname every time this process (re)starts -- including
+# after a VPS reboot or crash. Whenever it restarts, re-check the hostname
+# with `journalctl -u cloudflared-finalcheck -n 20` and update:
+#   - the frontend's VITE_API_BASE (e.g. Vercel project env var), and
+#   - CORS_ORIGIN in server/.env if the frontend origin also changed
+# then redeploy/restart as needed. A real domain (see deploy/deploy.sh's
+# certbot step) avoids this entirely with a stable HTTPS URL.
+
+[Install]
+WantedBy=multi-user.target

@@ -29,14 +29,14 @@ npm run dev         # http://localhost:5173 (자동으로 /api 요청을 4000번
 
 ## 데이터 모델
 
-- `server/src/data/roster.js` — 명단(238명)·조 색상·버스 수(8)·좌석 수(44). 인원이 바뀌면 이 파일만 고치면 됩니다.
+- `server/src/data/roster.js` — 명단(306명)·조 색상(8개)·버스 수(8)·좌석 수(44). 인원이 바뀌면 이 파일만 고치면 됩니다.
 - `server/data/board.db` — SQLite. 배정(`assignments`)과 출발(`departures`) 기록. 서버 실행 중 자동 생성됩니다.
 - `server/data/admin.json` — 관리자 비밀번호의 bcrypt 해시. 최초 실행 시 `.env`의 `ADMIN_PASSWORD`로 한 번 생성되고, 그 뒤로는 이 파일이 진실의 원천입니다. 비밀번호를 바꾸려면 이 파일을 지우고 `.env`의 `ADMIN_PASSWORD`를 새 값으로 바꾼 뒤 재시작하세요.
 
 ## 인증 모델
 
-- 관리자는 한 명(비밀번호 하나)만 존재합니다. 로그인하면 서명된 세션 쿠키(12시간)가 발급됩니다.
-- 관리자만 쓰기 API(`/api/assign`, `/api/cancel`, `/api/depart`, `/api/undepart`, `/api/reset`)를 호출할 수 있습니다. 로그인하지 않은 사람은 명단·좌석 조회만 가능합니다(`/api/state`, `/api/roster`).
+- 관리자는 한 명(비밀번호 하나)만 존재합니다. 로그인하면 서버가 토큰을 발급하고, 프런트엔드가 이를 `localStorage`에 저장해 이후 모든 쓰기 요청에 `Authorization: Bearer <token>` 헤더로 실어 보냅니다(12시간 만료). 쿠키를 쓰지 않기 때문에 프런트엔드와 API가 서로 다른 도메인(예: Vercel + VPS)이어도 그대로 동작합니다.
+- 관리자만 쓰기 API(`/api/assign`, `/api/cancel`, `/api/depart`, `/api/undepart`, `/api/reset`)를 호출할 수 있습니다. 로그인하지 않은 사람은 명단·좌석 조회만 가능합니다(`/api/state`, `/api/roster`, `/api/events`).
 - 세션이 만료되면 다음 쓰기 시도에서 401이 오고, 프런트엔드가 자동으로 보기 전용으로 전환합니다.
 
 ## 실시간 갱신
@@ -67,6 +67,14 @@ sudo certbot --nginx -d your-domain.example
 구성 요소:
 - `deploy/finalcheck-api.service` — Node 서버를 관리하는 systemd 유닛 (`systemctl status finalcheck-api`, `journalctl -u finalcheck-api -f`)
 - `deploy/nginx.conf.example` — React 정적 빌드 서빙 + `/api`를 Node로 프록시(SSE용 버퍼링 비활성화 포함)
+
+## 프런트엔드를 Vercel 등 다른 곳에서 서빙하기 (VPS는 API만)
+
+프런트엔드와 API를 서로 다른 곳에 배포할 수도 있습니다 (예: 화면은 Vercel, 데이터는 VPS). 인증이 토큰 방식이라 쿠키의 same-origin 제약이 없어 그대로 됩니다. 다만 **API가 HTTPS여야 합니다** — HTTPS 프런트엔드가 HTTP API를 호출하는 건 브라우저가 막습니다(Mixed Content).
+
+- **API를 HTTPS로 만드는 방법**: 가장 안정적인 건 도메인 구매 + certbot(위 섹션). 도메인 없이 임시로 하려면 `deploy/cloudflared-finalcheck.service`로 Cloudflare Quick Tunnel을 띄우면 `https://xxxx.trycloudflare.com` 같은 무료 HTTPS 주소가 생깁니다 — 단, 이 주소는 VPS 재부팅 등으로 터널이 재시작되면 바뀌므로, 바뀔 때마다 아래 프런트엔드 설정을 다시 맞춰줘야 합니다.
+- **프런트엔드 쪽 설정**: 빌드/배포 환경에 `VITE_API_BASE=https://<API 주소>/api` 환경 변수를 설정합니다 (Vercel이면 프로젝트 Settings → Environment Variables). 비워두면 지금처럼 같은 origin의 `/api`를 씁니다.
+- **API(VPS) 쪽 설정**: `server/.env`의 `CORS_ORIGIN`에 프런트엔드 주소를 추가합니다. 여러 개면 쉼표로 구분: `CORS_ORIGIN=http://31.97.71.87,https://your-project.vercel.app` 후 `systemctl restart finalcheck-api`.
 
 ## 알려진 사항
 

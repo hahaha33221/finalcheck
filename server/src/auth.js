@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
+import { verifySession } from './sessions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '..', 'data');
@@ -39,7 +40,16 @@ export function changeAdminPassword(newPlain) {
   fs.writeFileSync(adminFile, JSON.stringify({ hash: cachedHash }, null, 2));
 }
 
+function bearerToken(req) {
+  const header = req.headers.authorization || '';
+  return header.startsWith('Bearer ') ? header.slice(7) : null;
+}
+
 export function requireAdmin(req, res, next) {
-  if (req.session && req.session.isAdmin) return next();
+  if (verifySession(bearerToken(req))) return next();
   res.status(401).json({ error: 'not_admin' });
+}
+
+export function isAdminRequest(req) {
+  return verifySession(bearerToken(req));
 }

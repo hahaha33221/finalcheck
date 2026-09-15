@@ -57,17 +57,12 @@ if [ ! -f "$APP_DIR/server/.env" ]; then
   echo "==> First-time setup: creating server/.env"
   read -rsp "Set the admin login password for the board: " ADMIN_PW
   echo
-  SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
-  read -rp "Public URL the frontend will be served from (e.g. https://board.example.com), leave blank for http://SERVER_IP: " PUBLIC_URL
+  read -rp "Public URL(s) the frontend will be served from, comma-separated if more than one (e.g. http://SERVER_IP,https://your-project.vercel.app), leave blank for http://SERVER_IP: " PUBLIC_URL
   cat > "$APP_DIR/server/.env" <<EOF
 PORT=4000
 ADMIN_PASSWORD=${ADMIN_PW}
-SESSION_SECRET=${SESSION_SECRET}
 CORS_ORIGIN=${PUBLIC_URL}
 NODE_ENV=production
-# Flip to true once this site is served over HTTPS (see the certbot step below),
-# then run: systemctl restart finalcheck-api
-COOKIE_SECURE=false
 EOF
   chmod 600 "$APP_DIR/server/.env"
   echo "Wrote $APP_DIR/server/.env -- the admin password is hashed into server/data/admin.json on first boot;"
@@ -103,5 +98,3 @@ echo "Logs:       journalctl -u finalcheck-api -f"
 echo "Visit the server's IP or your domain over HTTP now; set up HTTPS with:"
 echo "  apt-get install -y certbot python3-certbot-nginx"
 echo "  certbot --nginx -d your-domain.example"
-echo "After HTTPS is working, also set COOKIE_SECURE=true in server/.env and:"
-echo "  systemctl restart finalcheck-api"

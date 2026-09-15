@@ -118,6 +118,7 @@ export default function App() {
         return { ok: true };
       } catch (err) {
         if (err.status === 401) {
+          api.clearSession();
           setIsAdmin(false);
           toast('로그인이 만료되었습니다. 다시 로그인해 주세요.');
         } else if (err.code === 'seat_taken') {
