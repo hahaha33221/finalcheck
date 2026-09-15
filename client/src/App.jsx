@@ -87,9 +87,16 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // pick an open bus once the roster/state have loaded, if the current one has departed
+  // Pick an open bus once, right after the roster/state first load, if the
+  // bus restored from localStorage has already departed by then. This must
+  // run only on that first load -- not on every curBus/d change -- otherwise
+  // it fights anyone who deliberately taps a departed bus's tab to check its
+  // roster/seat map afterwards (departed buses stay fully viewable; only new
+  // assignments to them are blocked, enforced elsewhere).
+  const pickedInitialBus = useRef(false);
   useEffect(() => {
-    if (!roster) return;
+    if (!roster || pickedInitialBus.current) return;
+    pickedInitialBus.current = true;
     if (d[curBus]) {
       const next = Array.from({ length: roster.busCount }, (_, i) => i + 1).find((b) => !d[b]);
       if (next) setCurBus(next);
