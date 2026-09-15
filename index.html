@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>명동 선착순 승차 확인</title>
+<style>
+  :root{
+    --red:#F32735; --blue:#0047BB; --yellow:#FBE126;
+    --ink:#1A1A1A; --sub:#595959; --muted:#9B9B9B; --rule:#E2E2E2;
+    --panel:#F2F2F2; --white:#FFFFFF; --gone:#3A3A3A;
+    --font:"Pretendard","Pretendard Variable",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    --dock:0px;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--panel);color:var(--ink);font-family:var(--font);-webkit-text-size-adjust:100%}
+  body{padding-bottom:calc(28px + var(--dock))}
+  button{font:inherit;color:inherit;cursor:pointer}
+  button:disabled{cursor:not-allowed}
+  button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  [hidden]{display:none !important}
+  .wrap{max-width:720px;margin:0 auto}
+  .num{font-variant-numeric:tabular-nums}
+
+  .stripe{height:5px;background:linear-gradient(90deg,var(--red) 0 70%,var(--yellow) 70% 100%)}
+  header{background:var(--white);padding:16px 16px 14px;border-bottom:1px solid var(--rule)}
+  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  h1{margin:0;font-size:20px;line-height:1.3;font-weight:800;letter-spacing:-0.02em}
+  .sub{margin:3px 0 0;font-size:13px;color:var(--sub)}
+  .modebtn{flex:none;border:1px solid var(--rule);background:var(--white);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+  .modebtn.on{background:var(--red);border-color:var(--red);color:#fff}
+  .summary{display:flex;gap:18px;margin-top:14px}
+  .summary div{font-size:13px;color:var(--sub)}
+  .summary b{display:block;font-size:26px;color:var(--ink);font-weight:800;letter-spacing:-0.03em;line-height:1.15}
+  .status{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+  .dot{width:7px;height:7px;border-radius:50%;background:#2DB463;flex:none}
+  .dot.warn{background:#E0A100}
+  .dot.err{background:var(--red)}
+
+  .buses{display:flex;gap:6px;overflow-x:auto;padding:12px 16px 2px;scrollbar-width:none}
+  .buses::-webkit-scrollbar{display:none}
+  .btab{flex:none;min-width:78px;border:1.5px solid var(--rule);background:var(--white);border-radius:10px;padding:7px 10px;text-align:left}
+  .btab b{display:block;font-size:15px;font-weight:800}
+  .btab small{display:block;font-size:12px;color:var(--sub);margin-top:1px}
+  .btab.go small{color:var(--blue);font-weight:600}
+  .btab.left small{color:var(--muted)}
+  .btab[aria-selected="true"]{border-color:var(--ink);background:var(--ink);color:#fff}
+  .btab[aria-selected="true"] small{color:#E6E6E6}
+
+  .views{display:flex;margin:12px 16px 0;background:#E4E4E4;border-radius:10px;padding:3px}
+  .views button{flex:1;border:0;background:none;border-radius:8px;padding:8px 0;font-size:14px;font-weight:600;color:var(--sub)}
+  .views button[aria-selected="true"]{background:var(--white);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+  .busbox{margin:12px 16px 0;background:var(--white);border-radius:14px;padding:16px 14px 18px}
+  .bushead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+  .bushead h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-0.02em}
+  .bushead .cnt{font-size:15px;color:var(--sub)}
+  .bushead .cnt b{font-size:24px;color:var(--ink);font-weight:800}
+  .state{margin:4px 0 0;font-size:13px;color:var(--sub)}
+  .state.go{color:var(--blue);font-weight:600}
+  .state.ready{color:var(--red);font-weight:700}
+  .meter{margin-top:10px;height:8px;border-radius:4px;background:var(--panel);overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--blue);transition:width .25s}
+  .meter.full i{background:var(--red)}
+  .meter.gone i{background:var(--gone)}
+  .front{margin:16px 0 8px;display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .seats{display:grid;grid-template-columns:1fr 1fr 14px 1fr 1fr;gap:6px}
+  .seat{border:1.5px solid var(--rule);background:var(--white);border-radius:9px 9px 5px 5px;min-height:54px;padding:6px 4px 5px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;overflow:hidden}
+  .seat b{font-size:15px;font-weight:800;line-height:1.15}
+  .seat small{font-size:10.5px;line-height:1.2;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seat.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  .seat.on small{color:#D6E2FA}
+  .seat.gone{background:var(--gone);border-color:var(--gone);color:#fff}
+  .seat.gone small{color:#BDBDBD}
+  .seat.gone.empty{background:var(--panel);border-color:var(--panel);color:var(--muted)}
+  .seat.empty.miss{border-color:#F7C2C6}
+  body:not(.admin) .seat.empty{cursor:default}
+  .legend{display:flex;gap:14px;margin-top:14px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend i{width:12px;height:12px;border-radius:3px;border:1.5px solid var(--rule)}
+
+  .controls{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);padding:12px 16px 8px}
+  .search{width:100%;border:1px solid var(--rule);background:var(--white);border-radius:10px;padding:11px 12px;font:inherit;font-size:15px}
+  .statusrow{display:flex;gap:6px;padding-top:8px}
+  .statusrow .chip{flex:1;justify-content:center}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;display:flex;align-items:center;gap:6px;border:1px solid var(--rule);background:var(--white);border-radius:999px;padding:6px 11px;font-size:13px;white-space:nowrap}
+  .chip small{color:var(--sub)}
+  .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+  .chip[aria-pressed="true"] small{color:#ddd}
+  .sw{width:10px;height:10px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);flex:none}
+  .filterinfo{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub);padding-top:6px;min-height:22px}
+  .linkbtn{border:0;background:none;color:var(--blue);font-size:12px;font-weight:600;padding:2px 0}
+  .hint{margin:0 16px 4px;font-size:12px;color:var(--sub)}
+  .grp{padding:14px 16px 6px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700}
+  .grp small{font-weight:500;color:var(--sub)}
+  ul{list-style:none;margin:0;padding:0 16px}
+  li{margin:0 0 4px}
+  .row{width:100%;display:flex;align-items:center;gap:10px;text-align:left;border:0;background:var(--white);border-radius:8px;padding:10px 12px 10px 0;cursor:default;overflow:hidden}
+  .row .edge{align-self:stretch;width:5px;flex:none}
+  .row .who{flex:1;min-width:0}
+  .row .nm{display:block;font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
+  .row .meta{display:block;font-size:12px;color:var(--sub);margin-top:1px}
+  .row .role{color:var(--blue);font-weight:600}
+  .row .err{display:block;font-size:12px;color:var(--red);margin-top:3px;font-weight:600}
+  .row .err:empty{display:none}
+  .tag{flex:none;min-width:58px;text-align:center;border-radius:6px;padding:6px 8px;font-size:13px;font-weight:700}
+  .tag.off{color:var(--muted);background:var(--panel);font-weight:500}
+  .tag.on{color:#fff;background:var(--blue)}
+  .tag.gone{color:#fff;background:var(--gone)}
+  .empty-note{margin:24px 16px;padding:28px 16px;text-align:center;background:var(--white);border-radius:10px;color:var(--sub);font-size:14px;line-height:1.6}
+  .asgform{flex:none;display:flex;align-items:center;gap:5px}
+  .tnum{display:flex;align-items:center;border:1.5px solid var(--rule);border-radius:8px;background:var(--white);height:38px;padding-left:8px}
+  .tnum:focus-within{border-color:var(--blue)}
+  .tnum span{font-size:14px;font-weight:700;color:var(--sub)}
+  .tnum input{width:42px;border:0;outline:0;background:transparent;font:inherit;font-size:16px;font-weight:700;padding:0 6px 0 1px;height:100%}
+  .asgbtn{border:0;border-radius:8px;background:var(--ink);color:#fff;height:38px;padding:0 11px;font-size:14px;font-weight:700}
+  .done{flex:none;display:flex;align-items:center;gap:6px}
+  .cxl{border:1px solid var(--rule);background:var(--white);border-radius:8px;height:32px;padding:0 9px;font-size:13px;color:var(--sub)}
+  .row.flash{animation:rowflash .8s ease-out}
+  @keyframes rowflash{from{background:#E3ECFB}to{background:var(--white)}}
+
+  .dock{display:none;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--white);border-top:1px solid var(--rule);padding:10px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  body.admin .dock{display:block}
+  .dock .in{max-width:688px;margin:0 auto}
+  .dock .lbl{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;font-size:12px;color:var(--sub);margin-bottom:8px}
+  .dock .lbl b{color:var(--ink)}
+  .dock .tools{display:flex;gap:12px;flex:none}
+  .dock .tools button{border:0;background:none;color:var(--sub);font-size:12px;padding:2px 0;text-decoration:underline}
+  .depart{width:100%;border:0;border-radius:12px;padding:15px 12px;font-size:16px;font-weight:800;background:var(--red);color:#fff}
+  .depart:disabled{background:#E4E4E4;color:#8A8A8A;font-weight:600}
+  .depart.done{background:var(--gone);color:#fff}
+  .dock .sec{display:flex;justify-content:center;margin-top:8px}
+  .dock .sec button{border:0;background:none;color:var(--sub);font-size:13px;text-decoration:underline;padding:2px 4px}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + var(--dock));z-index:30;background:var(--ink);color:#fff;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.4;display:none;align-items:center;justify-content:center;gap:14px;width:min(440px,calc(100% - 32px));box-shadow:0 6px 20px rgba(0,0,0,.25);text-align:center}
+  .toast.show{display:flex}
+
+  .scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}
+  .scrim.show{display:flex}
+  .modal{background:var(--white);border-radius:16px 16px 0 0;width:100%;max-width:480px;max-height:88vh;overflow:auto;padding:20px 18px calc(18px + env(safe-area-inset-bottom))}
+  @media (min-width:560px){ .scrim{align-items:center;padding:20px} .modal{border-radius:16px} }
+  .modal h3{margin:0 0 6px;font-size:19px}
+  .modal p{margin:0 0 14px;font-size:14px;color:var(--sub);line-height:1.6;white-space:pre-line}
+  .acts{display:flex;flex-direction:column;gap:8px}
+  .acts button{border:1px solid var(--rule);background:var(--white);border-radius:12px;padding:13px 16px;font-weight:700;font-size:15px}
+  .acts .primary{background:var(--red);border-color:var(--red);color:#fff}
+  .acts .dark{background:var(--ink);border-color:var(--ink);color:#fff}
+  .acts .danger{color:var(--red);border-color:#F7C2C6}
+  .acts .quiet{border-color:transparent;color:var(--sub);font-weight:600}
+
+  body.saving .row,body.saving .depart,body.saving #resetBtn,body.saving #secBtn,body.saving .seat,body.saving .modebtn,body.saving .asgbtn,body.saving .cxl{pointer-events:none;opacity:.55}
+
+  @media (prefers-reduced-motion:reduce){ .row.flash{animation:none} .meter i{transition:none} }
+</style>
+</head>
+<body>
+<div class="stripe"></div>
+<div class="wrap">
+  <header>
+    <div class="toprow">
+      <div>
+        <h1>명동 선착순 승차 확인</h1>
+        <p class="sub" id="modeText">보기 전용</p>
+      </div>
+      <button class="modebtn" id="adminBtn" type="button">관리자</button>
+    </div>
+    <div class="summary">
+      <div><b class="num" id="sumBoard">0</b>배정 완료</div>
+      <div><b class="num" id="sumLeft">0</b>미배정</div>
+      <div><b class="num" id="sumGone">0</b>출발 차량</div>
+    </div>
+    <div class="status" role="status"><span class="dot" id="dot"></span><span id="statusText">불러오는 중</span><button class="linkbtn" id="refreshBtn" type="button">새로고침</button></div>
+  </header>
+
+  <div class="buses" id="buses" role="tablist" aria-label="호차 선택"></div>
+
+  <div class="views" role="tablist" aria-label="보기 방식">
+    <button type="button" role="tab" data-v="roster" id="vRoster" aria-selected="true">명단</button>
+    <button type="button" role="tab" data-v="seats" id="vSeats" aria-selected="false">차량 현황</button>
+  </div>
+
+  <section id="rosterView">
+    <div class="controls">
+      <input class="search" id="q" type="search" placeholder="이름 검색" autocomplete="off" aria-label="이름 검색">
+      <div class="statusrow" id="statusChips" aria-label="배정 상태"></div>
+      <div class="chips" id="chips" aria-label="조 선택"></div>
+      <div class="filterinfo"><span id="filterText"></span><button class="linkbtn" id="clearBtn" type="button" hidden>필터 해제</button></div>
+    </div>
+    <p class="hint" id="rosterHint"></p>
+    <div id="list"></div>
+  </section>
+
+  <section id="seatView" hidden>
+    <div class="busbox">
+      <div class="bushead">
+        <h2 id="busTitle">1호차</h2>
+        <div class="cnt num"><b id="busCount">0</b> / 44석</div>
+      </div>
+      <p class="state" id="busState"></p>
+      <div class="meter" id="meter"><i id="meterFill" style="width:0"></i></div>
+      <div class="front"><span>앞쪽 (운전석)</span><span>출입문</span></div>
+      <div class="seats" id="seats"></div>
+      <div class="legend">
+        <span><i></i>빈 번호</span>
+        <span><i style="background:var(--blue);border-color:var(--blue)"></i>배정됨</span>
+        <span><i style="background:var(--gone);border-color:var(--gone)"></i>출발 확정</span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="dock" id="dock" aria-label="관리자 도구">
+  <div class="in">
+    <div class="lbl"><span id="dockHint"></span><span class="tools"><button type="button" id="resetBtn">전체 초기화</button><button type="button" id="logoutBtn">나가기</button></span></div>
+    <button type="button" class="depart" id="departBtn" disabled>최종확인</button>
+    <div class="sec"><button type="button" id="secBtn" hidden></button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"><span id="toastText"></span></div>
+
+<div class="scrim" id="scrim"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+<script id="state-data" type="application/json">{"t":{},"d":{},"u":0}</script>
+<script>
+const SHELL_HEAD = "<!DOCTYPE html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<title>명동 선착순 승차 확인</title>\n<style>\n  :root{\n    --red:#F32735; --blue:#0047BB; --yellow:#FBE126;\n    --ink:#1A1A1A; --sub:#595959; --muted:#9B9B9B; --rule:#E2E2E2;\n    --panel:#F2F2F2; --white:#FFFFFF; --gone:#3A3A3A;\n    --font:\"Pretendard\",\"Pretendard Variable\",-apple-system,BlinkMacSystemFont,\"Apple SD Gothic Neo\",\"Malgun Gothic\",\"Noto Sans KR\",sans-serif;\n    --dock:0px;\n    padding-top:env(safe-area-inset-top,0px);\n    padding-bottom:env(safe-area-inset-bottom,0px);\n  }\n  *{box-sizing:border-box}\n  html,body{margin:0;background:var(--panel);color:var(--ink);font-family:var(--font);-webkit-text-size-adjust:100%}\n  body{padding-bottom:calc(28px + var(--dock))}\n  button{font:inherit;color:inherit;cursor:pointer}\n  button:disabled{cursor:not-allowed}\n  button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}\n  [hidden]{display:none !important}\n  .wrap{max-width:720px;margin:0 auto}\n  .num{font-variant-numeric:tabular-nums}\n\n  .stripe{height:5px;background:linear-gradient(90deg,var(--red) 0 70%,var(--yellow) 70% 100%)}\n  header{background:var(--white);padding:16px 16px 14px;border-bottom:1px solid var(--rule)}\n  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}\n  h1{margin:0;font-size:20px;line-height:1.3;font-weight:800;letter-spacing:-0.02em}\n  .sub{margin:3px 0 0;font-size:13px;color:var(--sub)}\n  .modebtn{flex:none;border:1px solid var(--rule);background:var(--white);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}\n  .modebtn.on{background:var(--red);border-color:var(--red);color:#fff}\n  .summary{display:flex;gap:18px;margin-top:14px}\n  .summary div{font-size:13px;color:var(--sub)}\n  .summary b{display:block;font-size:26px;color:var(--ink);font-weight:800;letter-spacing:-0.03em;line-height:1.15}\n  .status{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--sub);flex-wrap:wrap}\n  .dot{width:7px;height:7px;border-radius:50%;background:#2DB463;flex:none}\n  .dot.warn{background:#E0A100}\n  .dot.err{background:var(--red)}\n\n  .buses{display:flex;gap:6px;overflow-x:auto;padding:12px 16px 2px;scrollbar-width:none}\n  .buses::-webkit-scrollbar{display:none}\n  .btab{flex:none;min-width:78px;border:1.5px solid var(--rule);background:var(--white);border-radius:10px;padding:7px 10px;text-align:left}\n  .btab b{display:block;font-size:15px;font-weight:800}\n  .btab small{display:block;font-size:12px;color:var(--sub);margin-top:1px}\n  .btab.go small{color:var(--blue);font-weight:600}\n  .btab.left small{color:var(--muted)}\n  .btab[aria-selected=\"true\"]{border-color:var(--ink);background:var(--ink);color:#fff}\n  .btab[aria-selected=\"true\"] small{color:#E6E6E6}\n\n  .views{display:flex;margin:12px 16px 0;background:#E4E4E4;border-radius:10px;padding:3px}\n  .views button{flex:1;border:0;background:none;border-radius:8px;padding:8px 0;font-size:14px;font-weight:600;color:var(--sub)}\n  .views button[aria-selected=\"true\"]{background:var(--white);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}\n\n  .busbox{margin:12px 16px 0;background:var(--white);border-radius:14px;padding:16px 14px 18px}\n  .bushead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}\n  .bushead h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-0.02em}\n  .bushead .cnt{font-size:15px;color:var(--sub)}\n  .bushead .cnt b{font-size:24px;color:var(--ink);font-weight:800}\n  .state{margin:4px 0 0;font-size:13px;color:var(--sub)}\n  .state.go{color:var(--blue);font-weight:600}\n  .state.ready{color:var(--red);font-weight:700}\n  .meter{margin-top:10px;height:8px;border-radius:4px;background:var(--panel);overflow:hidden}\n  .meter i{display:block;height:100%;background:var(--blue);transition:width .25s}\n  .meter.full i{background:var(--red)}\n  .meter.gone i{background:var(--gone)}\n  .front{margin:16px 0 8px;display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}\n  .seats{display:grid;grid-template-columns:1fr 1fr 14px 1fr 1fr;gap:6px}\n  .seat{border:1.5px solid var(--rule);background:var(--white);border-radius:9px 9px 5px 5px;min-height:54px;padding:6px 4px 5px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;overflow:hidden}\n  .seat b{font-size:15px;font-weight:800;line-height:1.15}\n  .seat small{font-size:10.5px;line-height:1.2;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n  .seat.on{background:var(--blue);border-color:var(--blue);color:#fff}\n  .seat.on small{color:#D6E2FA}\n  .seat.gone{background:var(--gone);border-color:var(--gone);color:#fff}\n  .seat.gone small{color:#BDBDBD}\n  .seat.gone.empty{background:var(--panel);border-color:var(--panel);color:var(--muted)}\n  .seat.empty.miss{border-color:#F7C2C6}\n  body:not(.admin) .seat.empty{cursor:default}\n  .legend{display:flex;gap:14px;margin-top:14px;font-size:12px;color:var(--sub);flex-wrap:wrap}\n  .legend span{display:flex;align-items:center;gap:5px}\n  .legend i{width:12px;height:12px;border-radius:3px;border:1.5px solid var(--rule)}\n\n  .controls{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);padding:12px 16px 8px}\n  .search{width:100%;border:1px solid var(--rule);background:var(--white);border-radius:10px;padding:11px 12px;font:inherit;font-size:15px}\n  .statusrow{display:flex;gap:6px;padding-top:8px}\n  .statusrow .chip{flex:1;justify-content:center}\n  .chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}\n  .chips::-webkit-scrollbar{display:none}\n  .chip{flex:none;display:flex;align-items:center;gap:6px;border:1px solid var(--rule);background:var(--white);border-radius:999px;padding:6px 11px;font-size:13px;white-space:nowrap}\n  .chip small{color:var(--sub)}\n  .chip[aria-pressed=\"true\"]{background:var(--ink);border-color:var(--ink);color:#fff}\n  .chip[aria-pressed=\"true\"] small{color:#ddd}\n  .sw{width:10px;height:10px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);flex:none}\n  .filterinfo{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub);padding-top:6px;min-height:22px}\n  .linkbtn{border:0;background:none;color:var(--blue);font-size:12px;font-weight:600;padding:2px 0}\n  .hint{margin:0 16px 4px;font-size:12px;color:var(--sub)}\n  .grp{padding:14px 16px 6px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700}\n  .grp small{font-weight:500;color:var(--sub)}\n  ul{list-style:none;margin:0;padding:0 16px}\n  li{margin:0 0 4px}\n  .row{width:100%;display:flex;align-items:center;gap:10px;text-align:left;border:0;background:var(--white);border-radius:8px;padding:10px 12px 10px 0;cursor:default;overflow:hidden}\n  .row .edge{align-self:stretch;width:5px;flex:none}\n  .row .who{flex:1;min-width:0}\n  .row .nm{display:block;font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}\n  .row .meta{display:block;font-size:12px;color:var(--sub);margin-top:1px}\n  .row .role{color:var(--blue);font-weight:600}\n  .row .err{display:block;font-size:12px;color:var(--red);margin-top:3px;font-weight:600}\n  .row .err:empty{display:none}\n  .tag{flex:none;min-width:58px;text-align:center;border-radius:6px;padding:6px 8px;font-size:13px;font-weight:700}\n  .tag.off{color:var(--muted);background:var(--panel);font-weight:500}\n  .tag.on{color:#fff;background:var(--blue)}\n  .tag.gone{color:#fff;background:var(--gone)}\n  .empty-note{margin:24px 16px;padding:28px 16px;text-align:center;background:var(--white);border-radius:10px;color:var(--sub);font-size:14px;line-height:1.6}\n  .asgform{flex:none;display:flex;align-items:center;gap:5px}\n  .tnum{display:flex;align-items:center;border:1.5px solid var(--rule);border-radius:8px;background:var(--white);height:38px;padding-left:8px}\n  .tnum:focus-within{border-color:var(--blue)}\n  .tnum span{font-size:14px;font-weight:700;color:var(--sub)}\n  .tnum input{width:42px;border:0;outline:0;background:transparent;font:inherit;font-size:16px;font-weight:700;padding:0 6px 0 1px;height:100%}\n  .asgbtn{border:0;border-radius:8px;background:var(--ink);color:#fff;height:38px;padding:0 11px;font-size:14px;font-weight:700}\n  .done{flex:none;display:flex;align-items:center;gap:6px}\n  .cxl{border:1px solid var(--rule);background:var(--white);border-radius:8px;height:32px;padding:0 9px;font-size:13px;color:var(--sub)}\n  .row.flash{animation:rowflash .8s ease-out}\n  @keyframes rowflash{from{background:#E3ECFB}to{background:var(--white)}}\n\n  .dock{display:none;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--white);border-top:1px solid var(--rule);padding:10px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.06)}\n  body.admin .dock{display:block}\n  .dock .in{max-width:688px;margin:0 auto}\n  .dock .lbl{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;font-size:12px;color:var(--sub);margin-bottom:8px}\n  .dock .lbl b{color:var(--ink)}\n  .dock .tools{display:flex;gap:12px;flex:none}\n  .dock .tools button{border:0;background:none;color:var(--sub);font-size:12px;padding:2px 0;text-decoration:underline}\n  .depart{width:100%;border:0;border-radius:12px;padding:15px 12px;font-size:16px;font-weight:800;background:var(--red);color:#fff}\n  .depart:disabled{background:#E4E4E4;color:#8A8A8A;font-weight:600}\n  .depart.done{background:var(--gone);color:#fff}\n  .dock .sec{display:flex;justify-content:center;margin-top:8px}\n  .dock .sec button{border:0;background:none;color:var(--sub);font-size:13px;text-decoration:underline;padding:2px 4px}\n\n  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + var(--dock));z-index:30;background:var(--ink);color:#fff;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.4;display:none;align-items:center;justify-content:center;gap:14px;width:min(440px,calc(100% - 32px));box-shadow:0 6px 20px rgba(0,0,0,.25);text-align:center}\n  .toast.show{display:flex}\n\n  .scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}\n  .scrim.show{display:flex}\n  .modal{background:var(--white);border-radius:16px 16px 0 0;width:100%;max-width:480px;max-height:88vh;overflow:auto;padding:20px 18px calc(18px + env(safe-area-inset-bottom))}\n  @media (min-width:560px){ .scrim{align-items:center;padding:20px} .modal{border-radius:16px} }\n  .modal h3{margin:0 0 6px;font-size:19px}\n  .modal p{margin:0 0 14px;font-size:14px;color:var(--sub);line-height:1.6;white-space:pre-line}\n  .acts{display:flex;flex-direction:column;gap:8px}\n  .acts button{border:1px solid var(--rule);background:var(--white);border-radius:12px;padding:13px 16px;font-weight:700;font-size:15px}\n  .acts .primary{background:var(--red);border-color:var(--red);color:#fff}\n  .acts .dark{background:var(--ink);border-color:var(--ink);color:#fff}\n  .acts .danger{color:var(--red);border-color:#F7C2C6}\n  .acts .quiet{border-color:transparent;color:var(--sub);font-weight:600}\n\n  body.saving .row,body.saving .depart,body.saving #resetBtn,body.saving #secBtn,body.saving .seat,body.saving .modebtn,body.saving .asgbtn,body.saving .cxl{pointer-events:none;opacity:.55}\n\n  @media (prefers-reduced-motion:reduce){ .row.flash{animation:none} .meter i{transition:none} }\n</style>\n</head>";
+const SHELL_BODY = "<body>\n<div class=\"stripe\"></div>\n<div class=\"wrap\">\n  <header>\n    <div class=\"toprow\">\n      <div>\n        <h1>명동 선착순 승차 확인</h1>\n        <p class=\"sub\" id=\"modeText\">보기 전용</p>\n      </div>\n      <button class=\"modebtn\" id=\"adminBtn\" type=\"button\">관리자</button>\n    </div>\n    <div class=\"summary\">\n      <div><b class=\"num\" id=\"sumBoard\">0</b>배정 완료</div>\n      <div><b class=\"num\" id=\"sumLeft\">0</b>미배정</div>\n      <div><b class=\"num\" id=\"sumGone\">0</b>출발 차량</div>\n    </div>\n    <div class=\"status\" role=\"status\"><span class=\"dot\" id=\"dot\"></span><span id=\"statusText\">불러오는 중</span><button class=\"linkbtn\" id=\"refreshBtn\" type=\"button\">새로고침</button></div>\n  </header>\n\n  <div class=\"buses\" id=\"buses\" role=\"tablist\" aria-label=\"호차 선택\"></div>\n\n  <div class=\"views\" role=\"tablist\" aria-label=\"보기 방식\">\n    <button type=\"button\" role=\"tab\" data-v=\"roster\" id=\"vRoster\" aria-selected=\"true\">명단</button>\n    <button type=\"button\" role=\"tab\" data-v=\"seats\" id=\"vSeats\" aria-selected=\"false\">차량 현황</button>\n  </div>\n\n  <section id=\"rosterView\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"이름 검색\" autocomplete=\"off\" aria-label=\"이름 검색\">\n      <div class=\"statusrow\" id=\"statusChips\" aria-label=\"배정 상태\"></div>\n      <div class=\"chips\" id=\"chips\" aria-label=\"조 선택\"></div>\n      <div class=\"filterinfo\"><span id=\"filterText\"></span><button class=\"linkbtn\" id=\"clearBtn\" type=\"button\" hidden>필터 해제</button></div>\n    </div>\n    <p class=\"hint\" id=\"rosterHint\"></p>\n    <div id=\"list\"></div>\n  </section>\n\n  <section id=\"seatView\" hidden>\n    <div class=\"busbox\">\n      <div class=\"bushead\">\n        <h2 id=\"busTitle\">1호차</h2>\n        <div class=\"cnt num\"><b id=\"busCount\">0</b> / 44석</div>\n      </div>\n      <p class=\"state\" id=\"busState\"></p>\n      <div class=\"meter\" id=\"meter\"><i id=\"meterFill\" style=\"width:0\"></i></div>\n      <div class=\"front\"><span>앞쪽 (운전석)</span><span>출입문</span></div>\n      <div class=\"seats\" id=\"seats\"></div>\n      <div class=\"legend\">\n        <span><i></i>빈 번호</span>\n        <span><i style=\"background:var(--blue);border-color:var(--blue)\"></i>배정됨</span>\n        <span><i style=\"background:var(--gone);border-color:var(--gone)\"></i>출발 확정</span>\n      </div>\n    </div>\n  </section>\n</div>\n\n<div class=\"dock\" id=\"dock\" aria-label=\"관리자 도구\">\n  <div class=\"in\">\n    <div class=\"lbl\"><span id=\"dockHint\"></span><span class=\"tools\"><button type=\"button\" id=\"resetBtn\">전체 초기화</button><button type=\"button\" id=\"logoutBtn\">나가기</button></span></div>\n    <button type=\"button\" class=\"depart\" id=\"departBtn\" disabled>최종확인</button>\n    <div class=\"sec\"><button type=\"button\" id=\"secBtn\" hidden></button></div>\n  </div>\n</div>\n\n<div class=\"toast\" id=\"toast\" role=\"status\"><span id=\"toastText\"></span></div>\n\n<div class=\"scrim\" id=\"scrim\"><div class=\"modal\" id=\"modal\" role=\"dialog\" aria-modal=\"true\"></div></div>";
+const GROUPS = [
+  {id:1,name:'빨강',color:'#FF0000'},
+  {id:2,name:'주황',color:'#FF9900'},
+  {id:3,name:'노랑',color:'#FFE600'},
+  {id:4,name:'초록',color:'#6AA84F'},
+  {id:5,name:'남색',color:'#1C4587'},
+  {id:6,name:'색 미지정',color:'#BDBDBD'}
+];
+const PEOPLE = [{"i":"p000","g":1,"n":"이예령 매니저","s":"","r":"그룹 리더"},{"i":"p001","g":1,"n":"안무근 시니어","s":"","r":"스태프"},{"i":"p002","g":1,"n":"Genden Badamkhand (벨라뎃다)","s":"","r":"서브 봉사자"},{"i":"p003","g":1,"n":"Aniel Luis Santiesteban Garcia","s":"남","r":""},{"i":"p004","g":1,"n":"Erika Teles Dos Santos","s":"여","r":""},{"i":"p005","g":1,"n":"Giancarlo Francisco","s":"남","r":""},{"i":"p006","g":1,"n":"Gosife Eze","s":"남","r":""},{"i":"p007","g":1,"n":"Jiun Anastasia LEE","s":"여","r":""},{"i":"p008","g":1,"n":"José Miguel Gutiérrez Carreòn","s":"남","r":""},{"i":"p009","g":1,"n":"Madeline Forde","s":"여","r":""},{"i":"p010","g":1,"n":"Miguel Francisco Rojas Navarro","s":"남","r":""},{"i":"p011","g":1,"n":"Nathaniel Marvel Arifin","s":"남","r":""},{"i":"p012","g":1,"n":"Rita Matanyi","s":"여","r":""},{"i":"p013","g":1,"n":"Rodrigo Figueiredo","s":"남","r":""},{"i":"p014","g":1,"n":"Sara Angelucci","s":"여","r":""},{"i":"p015","g":1,"n":"Thibault Pfeffer","s":"남","r":""},{"i":"p016","g":1,"n":"Tracy Alchalfoun","s":"여","r":""},{"i":"p017","g":1,"n":"Wyatt Olivas","s":"남","r":""},{"i":"p018","g":1,"n":"Ximena Alejandra Valdivia Muro","s":"여","r":""},{"i":"p019","g":1,"n":"Yasmine Sally","s":"여","r":""},{"i":"p020","g":1,"n":"BIKASH REBEIRO","s":"남","r":""},{"i":"p021","g":1,"n":"Eze Nwoko","s":"남","r":""},{"i":"p022","g":1,"n":"Fr. Ron Pangan","s":"남","r":""},{"i":"p023","g":1,"n":"Luciano COUTO","s":"남","r":""},{"i":"p024","g":1,"n":"Michel Remery","s":"남","r":""},{"i":"p025","g":1,"n":"PROLOY A D CRUZE","s":"남","r":""},{"i":"p026","g":1,"n":"Han-Yol SHIN","s":"남","r":""},{"i":"p027","g":1,"n":"SR. SHARON PALENCIA, OND","s":"여","r":""},{"i":"p028","g":1,"n":"Makiko Chiba (passport name: Makiko KOJIMA)","s":"여","r":""},{"i":"p029","g":1,"n":"Bertha Samponu","s":"여","r":""},{"i":"p030","g":1,"n":"Carlos Beltran","s":"남","r":""},{"i":"p031","g":1,"n":"ELLIS SOUTHWELL","s":"남","r":""},{"i":"p032","g":1,"n":"Gerald Woode","s":"남","r":""},{"i":"p033","g":1,"n":"Jacinta Fernandez","s":"여","r":""},{"i":"p034","g":1,"n":"Marta Põld","s":"여","r":""},{"i":"p035","g":1,"n":"Ogie De Fiesta","s":"남","r":""},{"i":"p036","g":1,"n":"Selwyn Macwan","s":"남","r":""},{"i":"p037","g":1,"n":"도슨트 1","s":"","r":"운영"},{"i":"p038","g":1,"n":"스피커 담당 1","s":"","r":"운영"},{"i":"p039","g":2,"n":"이유담 매니저","s":"","r":"그룹 리더"},{"i":"p040","g":2,"n":"박세진 이사","s":"","r":"스태프"},{"i":"p041","g":2,"n":"김소현 요셉피나","s":"","r":"서브 봉사자"},{"i":"p042","g":2,"n":"홍상지 마리스텔라","s":"","r":"서브 봉사자"},{"i":"p043","g":2,"n":"Thomas Park","s":"남","r":""},{"i":"p044","g":2,"n":"Joseph Nguyen Thanh Cong","s":"남","r":""},{"i":"p045","g":2,"n":"Sawyer Mbokeh","s":"남","r":""},{"i":"p046","g":2,"n":"FRANCISCO INDRA DO NACIMENTO TEY SERAN","s":"남","r":""},{"i":"p047","g":2,"n":"Dolthisak Chatbanyong","s":"남","r":""},{"i":"p048","g":2,"n":"Daniel Williamson","s":"남","r":""},{"i":"p049","g":2,"n":"Gustavo Adrian Benitez","s":"남","r":""},{"i":"p050","g":2,"n":"Kyaw Thu Win","s":"남","r":""},{"i":"p051","g":2,"n":"WALDEMAR PAWELEC","s":"남","r":""},{"i":"p052","g":2,"n":"Ms. Momoko Nishimura, semd","s":"여","r":""},{"i":"p053","g":2,"n":"Sara Duaibes","s":"여","r":""},{"i":"p054","g":2,"n":"Silvia Bertozzi","s":"여","r":""},{"i":"p055","g":2,"n":"Isabel Correa","s":"여","r":""},{"i":"p056","g":2,"n":"Holly Kirsten Eugenio","s":"여","r":""},{"i":"p057","g":2,"n":"Lisethe Niilus","s":"여","r":""},{"i":"p058","g":2,"n":"Hoang Huyen Thi","s":"여","r":""},{"i":"p059","g":2,"n":"Joanna Chng","s":"여","r":""},{"i":"p060","g":2,"n":"Kristen Yeo","s":"여","r":""},{"i":"p061","g":2,"n":"NATALINO DE JESUS DIAS","s":"남","r":""},{"i":"p062","g":2,"n":"Elin Jönsson","s":"여","r":""},{"i":"p063","g":2,"n":"CATHY JONES WILLIAM MICHAEL RAJ","s":"여","r":""},{"i":"p064","g":2,"n":"Sirikanya Makulwanichnan","s":"여","r":""},{"i":"p065","g":2,"n":"Veronica Snerle Holsting","s":"여","r":""},{"i":"p066","g":2,"n":"Lea Noval","s":"여","r":""},{"i":"p067","g":2,"n":"Jennifer Flor -Wilczek","s":"여","r":""},{"i":"p068","g":2,"n":"Saroeun Sorn","s":"남","r":""},{"i":"p069","g":2,"n":"Aung Kyaw Oo","s":"남","r":""},{"i":"p070","g":2,"n":"Mildred Isleta","s":"여","r":""},{"i":"p071","g":2,"n":"Virdi Esleta","s":"남","r":""},{"i":"p072","g":2,"n":"Joan Sing","s":"여","r":""},{"i":"p073","g":2,"n":"KUOK LEONG BOSCO WONG","s":"남","r":""},{"i":"p074","g":2,"n":"Martin Kocian","s":"남","r":""},{"i":"p075","g":2,"n":"Natalie Doherty","s":"여","r":""},{"i":"p076","g":2,"n":"Roshan Melwyn Lobo","s":"남","r":""},{"i":"p077","g":2,"n":"Joan Kristine Batacan","s":"여","r":""},{"i":"p078","g":2,"n":"Mark Anthony Galamgam","s":"남","r":""},{"i":"p079","g":2,"n":"Agatha Lydia Natania","s":"여","r":""},{"i":"p080","g":2,"n":"MAVIS ANIMA Bonsu","s":"여","r":""},{"i":"p081","g":3,"n":"김민석 시니어","s":"","r":"그룹 리더"},{"i":"p082","g":3,"n":"이상은 매니저","s":"","r":"스태프"},{"i":"p083","g":3,"n":"박연수 가브리엘라","s":"","r":"메인 봉사자"},{"i":"p084","g":3,"n":"김예은 로사","s":"","r":"서브 봉사자"},{"i":"p085","g":3,"n":"양혜경 마리아","s":"","r":"서브 봉사자"},{"i":"p086","g":3,"n":"Adreas Rupprecht","s":"남","r":""},{"i":"p087","g":3,"n":"IDOKO BONIFACE IDOKO","s":"남","r":""},{"i":"p088","g":3,"n":"Jinwoo Nam","s":"남","r":""},{"i":"p089","g":3,"n":"Matevž Mehle","s":"남","r":""},{"i":"p090","g":3,"n":"Rodel Aclan","s":"남","r":""},{"i":"p091","g":3,"n":"Seonu (Ladislaus) Paek","s":"남","r":""},{"i":"p092","g":3,"n":"Szymon Grzywinski","s":"남","r":""},{"i":"p093","g":3,"n":"Tillard Timothée","s":"남","r":""},{"i":"p094","g":3,"n":"TOMASZ KOPRIANIUK","s":"남","r":""},{"i":"p095","g":3,"n":"Faten Isayed","s":"여","r":""},{"i":"p096","g":3,"n":"Rian van Berkum","s":"여","r":""},{"i":"p097","g":3,"n":"Wismary Kharbihkhiew","s":"여","r":""},{"i":"p098","g":3,"n":"Albert Debono","s":"남","r":""},{"i":"p099","g":3,"n":"Amos Tan","s":"남","r":""},{"i":"p100","g":3,"n":"Anna Maria Pfister","s":"여","r":""},{"i":"p101","g":3,"n":"Bernadette Fenech","s":"여","r":""},{"i":"p102","g":3,"n":"Bernardia Monica Santoso","s":"여","r":""},{"i":"p103","g":3,"n":"Catherine Brawley","s":"여","r":""},{"i":"p104","g":3,"n":"Ferosta Basumatary","s":"여","r":""},{"i":"p105","g":3,"n":"JECYREL BELGA","s":"여","r":""},{"i":"p106","g":3,"n":"Joyce Zako","s":"여","r":""},{"i":"p107","g":3,"n":"Julian Nguyen","s":"남","r":""},{"i":"p108","g":3,"n":"Khayam Malik","s":"남","r":""},{"i":"p109","g":3,"n":"Mark Christian Roble Almazan","s":"남","r":""},{"i":"p110","g":3,"n":"Meklit Solomon Hailemichael","s":"여","r":""},{"i":"p111","g":3,"n":"MIDHUN PAUL","s":"남","r":""},{"i":"p112","g":3,"n":"Mishal Novani","s":"여","r":""},{"i":"p113","g":3,"n":"My Chi Le","s":"여","r":""},{"i":"p114","g":3,"n":"Nils Jonas Osterwind","s":"남","r":""},{"i":"p115","g":3,"n":"Qwayne Ybe Guevara","s":"여","r":""},{"i":"p116","g":3,"n":"Rebecca Rathbone","s":"여","r":""},{"i":"p117","g":3,"n":"Selvi Ruffina Thangaprakasam","s":"여","r":""},{"i":"p118","g":3,"n":"VIKTORIA MARIA SAMP Samp","s":"여","r":""},{"i":"p119","g":3,"n":"도슨트 2","s":"","r":"운영"},{"i":"p120","g":3,"n":"스피커 담당 2","s":"","r":"운영"},{"i":"p121","g":4,"n":"이정현 매니저","s":"","r":"그룹 리더"},{"i":"p122","g":4,"n":"이예님 책임","s":"","r":"스태프"},{"i":"p123","g":4,"n":"유인선 엘리사벳","s":"","r":"메인 봉사자"},{"i":"p124","g":4,"n":"김효은 아녜스","s":"","r":"서브 봉사자"},{"i":"p125","g":4,"n":"임효현 안젤라","s":"","r":"서브 봉사자"},{"i":"p126","g":4,"n":"/ / MOUBE","s":"남","r":""},{"i":"p127","g":4,"n":"Blaj Marian","s":"남","r":""},{"i":"p128","g":4,"n":"COSMAS MULINGE","s":"남","r":""},{"i":"p129","g":4,"n":"Fr Kabuua Tonganibeia","s":"남","r":""},{"i":"p130","g":4,"n":"Fr. Johane Maseko","s":"남","r":""},{"i":"p131","g":4,"n":"FRANS KRISTI ADI PRASETYA","s":"남","r":""},{"i":"p132","g":4,"n":"Levon (passport name) Hovsep (priest name) Galstyan","s":"남","r":""},{"i":"p133","g":4,"n":"Martin Ernest Ele","s":"남","r":""},{"i":"p134","g":4,"n":"Roman Kubín","s":"남","r":""},{"i":"p135","g":4,"n":"Anita Vranić","s":"여","r":""},{"i":"p136","g":4,"n":"Carla Beatrice Munteanu","s":"여","r":""},{"i":"p137","g":4,"n":"CHEN-HSUAN TAO","s":"여","r":""},{"i":"p138","g":4,"n":"CHUI SHAN LEUNG","s":"여","r":""},{"i":"p139","g":4,"n":"Claudiu Roznovszky","s":"남","r":""},{"i":"p140","g":4,"n":"Dana Tannous","s":"여","r":""},{"i":"p141","g":4,"n":"EJ Dolor","s":"남","r":""},{"i":"p142","g":4,"n":"Elizabeth Lopez","s":"여","r":""},{"i":"p143","g":4,"n":"Jany Saade","s":"여","r":""},{"i":"p144","g":4,"n":"Jonathan Wuyts","s":"남","r":""},{"i":"p145","g":4,"n":"Joselle Corpus","s":"여","r":""},{"i":"p146","g":4,"n":"JOY AMPILOQUIO","s":"여","r":""},{"i":"p147","g":4,"n":"Kati Dijane","s":"여","r":""},{"i":"p148","g":4,"n":"Klemen Kerin","s":"남","r":""},{"i":"p149","g":4,"n":"MARIA CLARIZA MATUTE","s":"여","r":""},{"i":"p150","g":4,"n":"Nobin Jose","s":"남","r":""},{"i":"p151","g":4,"n":"Paul Jarzembowski","s":"남","r":""},{"i":"p152","g":4,"n":"Paul Metzlaff","s":"남","r":""},{"i":"p153","g":4,"n":"Raed Dalal","s":"남","r":""},{"i":"p154","g":4,"n":"Rita Erzsébet Bocsák","s":"","r":""},{"i":"p155","g":4,"n":"Sara Aljamal","s":"여","r":""},{"i":"p156","g":4,"n":"Sohyeon Jang","s":"여","r":""},{"i":"p157","g":4,"n":"Susilo Kentjana","s":"남","r":""},{"i":"p158","g":4,"n":"Suzzanne Saniel","s":"여","r":""},{"i":"p159","g":4,"n":"Wai Sze Au Yang","s":"여","r":""},{"i":"p160","g":4,"n":"Wye Min Christopher Siow","s":"남","r":""},{"i":"p161","g":4,"n":"Zaklina Melis","s":"여","r":""},{"i":"p162","g":5,"n":"김태은 책임","s":"","r":"그룹 리더"},{"i":"p163","g":5,"n":"박철민 팀장","s":"","r":"스태프"},{"i":"p164","g":5,"n":"Kanto Carina(칸투카리나)","s":"","r":"메인 봉사자"},{"i":"p165","g":5,"n":"이지윤 세실리아","s":"","r":"서브 봉사자"},{"i":"p166","g":5,"n":"Alain-Joseph LOMANDJA","s":"남","r":""},{"i":"p167","g":5,"n":"Alexis NDAGIJIMANA","s":"남","r":""},{"i":"p168","g":5,"n":"André Lauer Favoretti","s":"남","r":""},{"i":"p169","g":5,"n":"Benoit Leclerc","s":"남","r":""},{"i":"p170","g":5,"n":"Bertrand Zoukpakilé Saoromou","s":"남","r":""},{"i":"p171","g":5,"n":"Cassaginol Métellus","s":"남","r":""},{"i":"p172","g":5,"n":"Diego Reinaldo de Lima","s":"남","r":""},{"i":"p173","g":5,"n":"JEAN LUC RATOVONJANAHARY","s":"남","r":""},{"i":"p174","g":5,"n":"Kanga François Komenan","s":"남","r":""},{"i":"p175","g":5,"n":"Luís Gonzaga Marinho Teixeira da Silva","s":"남","r":""},{"i":"p176","g":5,"n":"Michael Oyono Moussavou","s":"남","r":""},{"i":"p177","g":5,"n":"MULUMBA KABAMBA GATIEN","s":"남","r":""},{"i":"p178","g":5,"n":"Oyeniran Arsene Balogoun","s":"남","r":""},{"i":"p179","g":5,"n":"Rémy Pignal","s":"남","r":""},{"i":"p180","g":5,"n":"SAWADOGO Pendwêndé Paul Frédéric","s":"남","r":""},{"i":"p181","g":5,"n":"Sylvain Vianney BAMANA","s":"남","r":""},{"i":"p182","g":5,"n":"Myriam Moderne","s":"여","r":""},{"i":"p183","g":5,"n":"Salomé BEIGNON","s":"여","r":""},{"i":"p184","g":5,"n":"Aline Jacquier","s":"여","r":""},{"i":"p185","g":5,"n":"Annabelle Arna","s":"여","r":""},{"i":"p186","g":5,"n":"Antoine d'Hoop","s":"남","r":""},{"i":"p187","g":5,"n":"ARNAUD SOMAÏNI LALLEMENT","s":"남","r":""},{"i":"p188","g":5,"n":"Augustin Faya MILLIMONO","s":"남","r":""},{"i":"p189","g":5,"n":"Bénita Mutoni","s":"여","r":""},{"i":"p190","g":5,"n":"Melchior de Massary","s":"남","r":""},{"i":"p191","g":5,"n":"Miklós GÁBOR","s":"남","r":""},{"i":"p192","g":5,"n":"RADIMAHO RANDRIANANDRASANA","s":"남","r":""},{"i":"p193","g":5,"n":"Salonee Bugwondeen","s":"여","r":""},{"i":"p194","g":5,"n":"Sixtine Tresca","s":"여","r":""},{"i":"p195","g":5,"n":"도슨트 3","s":"","r":"운영"},{"i":"p196","g":5,"n":"스피커 담당 3","s":"","r":"운영"},{"i":"p197","g":5,"n":"Jun LEE","s":"남","r":""},{"i":"p198","g":6,"n":"전주영 매니저","s":"","r":"그룹 리더"},{"i":"p199","g":6,"n":"김여은 매니저","s":"","r":"스태프"},{"i":"p200","g":6,"n":"Daniela","s":"","r":"서브 봉사자"},{"i":"p201","g":6,"n":"Alex Francisco Ramos Sandoval","s":"남","r":""},{"i":"p202","g":6,"n":"Jorge Tejeda","s":"남","r":""},{"i":"p203","g":6,"n":"José Rodrigo Muñoz Fuentes","s":"남","r":""},{"i":"p204","g":6,"n":"Junior Antonio Delgado Martínez","s":"남","r":""},{"i":"p205","g":6,"n":"Oswaldo Enrique Chacón","s":"남","r":""},{"i":"p206","g":6,"n":"Pedro Antonio Madrid","s":"남","r":""},{"i":"p207","g":6,"n":"Grecia Maricielo Barraga Pinares","s":"여","r":""},{"i":"p208","g":6,"n":"Jiménez García Miguelina Esther","s":"여","r":""},{"i":"p209","g":6,"n":"TAESICK KIM","s":"남","r":""},{"i":"p210","g":6,"n":"Yong Hee KIM","s":"여","r":""},{"i":"p211","g":6,"n":"Augusto Parravicini","s":"남","r":""},{"i":"p212","g":6,"n":"César Adrián Hernández Morales","s":"남","r":""},{"i":"p213","g":6,"n":"Cristina Regueira","s":"여","r":""},{"i":"p214","g":6,"n":"Emma Querol García","s":"여","r":""},{"i":"p215","g":6,"n":"Erick Sanjur","s":"남","r":""},{"i":"p216","g":6,"n":"Francisco José Ramírez Mora","s":"남","r":""},{"i":"p217","g":6,"n":"Gerinus Cheolwoo LEE","s":"남","r":""},{"i":"p218","g":6,"n":"Giancarlo Montero Robles","s":"남","r":""},{"i":"p219","g":6,"n":"Grace Martínez Ramírez","s":"여","r":""},{"i":"p220","g":6,"n":"Gustavo Galindo Valenzuela","s":"남","r":""},{"i":"p221","g":6,"n":"hae jung kang","s":"여","r":""},{"i":"p222","g":6,"n":"Ju Yeon (Ines) KIM","s":"여","r":""},{"i":"p223","g":6,"n":"Leonardo Roy Arispe Oviedo","s":"남","r":""},{"i":"p224","g":6,"n":"María Aguilar Gómez-Calcerrada","s":"여","r":""},{"i":"p225","g":6,"n":"Martin Ernesto Munoz Cienfuegos","s":"남","r":""},{"i":"p226","g":6,"n":"Melvin Ulises Vargas Sánchez","s":"남","r":""},{"i":"p227","g":6,"n":"Neva Cifuentes","s":"여","r":""},{"i":"p228","g":6,"n":"Rosa Cerro Silla","s":"여","r":""},{"i":"p229","g":6,"n":"Sathya Barascout","s":"여","r":""},{"i":"p230","g":6,"n":"Seongyeon Cheon","s":"남","r":""},{"i":"p231","g":6,"n":"Sofía Carolina Barros Fernández","s":"여","r":""},{"i":"p232","g":6,"n":"Tamara Ramona Lugo Diaz","s":"여","r":""},{"i":"p233","g":6,"n":"Yessenia Negrón Rivera","s":"여","r":""},{"i":"p234","g":6,"n":"Yithzak Gonzalez","s":"남","r":""},{"i":"p235","g":6,"n":"Gonzalez Lopez Maria Jose","s":"여","r":""},{"i":"p236","g":6,"n":"Henry Garzon","s":"","r":""},{"i":"p237","g":6,"n":"Sofia Garzon","s":"","r":""}];
+const BUS_COUNT = 8;
+const SEATS = 44;
+const BUSES = Array.from({length:BUS_COUNT}, (_,i) => i + 1);
+
+const SELF_SRC = document.currentScript ? document.currentScript.textContent : '';
+
+const byId = Object.fromEntries(PEOPLE.map(p => [p.i, p]));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const SEARCH = Object.fromEntries(PEOPLE.map(p => [p.i, fold(p.n + ' ' + p.r)]));
+const hm = t => t ? new Date(t).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}) : '-';
+const hms = t => t ? new Date(t).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : '-';
+const key = (b,n) => `${b}-${n}`;
+const busOf = k => +k.split('-')[0];
+const gone = b => !!S.d[b];
+const countBus = b => { let c = 0; for(let n = 1; n <= SEATS; n++) if(S.t[key(b,n)]) c++; return c; };
+const emptyNums = b => { const a = []; for(let n = 1; n <= SEATS; n++) if(!S.t[key(b,n)]) a.push(n); return a; };
+function ownedMap(){ const m = {}; for(const k in S.t){ if(S.t[k].p) m[S.t[k].p] = k; } return m; }
+const firstOpenBus = () => BUSES.find(x => !gone(x));
+
+let S = {t:{}, d:{}, u:0};
+let isAdmin = false, curBus = 1, view = 'roster';
+let fGroup = 0, fState = 'all', query = '';
+let saving = false, flashId = null;
+let artifactApi = null, noStorage = false;
+
+const $ = id => document.getElementById(id);
+
+function buildDocument(state){
+  const stateJson = JSON.stringify(state).replace(/</g, '<');
+  return SHELL_HEAD + SHELL_BODY
+    + '\n<script id="state-data" type="application/json">' + stateJson + '<' + '/script>\n'
+    + '<script>' + SELF_SRC + '<' + '/script>\n'
+    + '</body>\n</html>';
+}
+
+function setStatus(kind, text){
+  $('dot').className = 'dot' + (kind === 'ok' ? '' : kind === 'warn' ? ' warn' : ' err');
+  $('statusText').textContent = text;
+}
+function okStatus(){
+  if(noStorage){ setStatus('err','저장 기능이 없는 환경입니다. 이 화면은 보기 전용입니다.'); return; }
+  setStatus('ok', (isAdmin ? '관리자 모드' : '보기 전용') + (S.u ? (', 마지막 변경 ' + hms(S.u)) : ''));
+}
+
+function render(){
+  document.body.classList.toggle('saving', saving);
+  const owned = ownedMap();
+  const assigned = Object.keys(owned).length;
+  $('sumBoard').textContent = assigned;
+  $('sumLeft').textContent = PEOPLE.length - assigned;
+  $('sumGone').textContent = BUSES.filter(gone).length;
+
+  $('buses').innerHTML = BUSES.map(b => {
+    const c = countBus(b);
+    let cls = '', txt;
+    if(gone(b)){ cls = 'left'; txt = `출발 ${hm(S.d[b])}`; }
+    else if(c){ cls = 'go'; txt = `${c}/${SEATS}`; }
+    else txt = '대기';
+    return `<button type="button" role="tab" class="btab ${cls}" data-b="${b}" aria-selected="${b === curBus}"><b>${b}호차</b><small class="num">${txt}</small></button>`;
+  }).join('');
+
+  $('vSeats').setAttribute('aria-selected', view === 'seats');
+  $('vRoster').setAttribute('aria-selected', view === 'roster');
+  $('seatView').hidden = view !== 'seats';
+  $('rosterView').hidden = view !== 'roster';
+
+  renderRoster(owned);
+  renderSeats();
+  renderDock();
+}
+
+function renderRoster(owned){
+  const grpCt = {}; GROUPS.forEach(g => grpCt[g.id] = {done:0,total:0});
+  for(const p of PEOPLE){ grpCt[p.g].total++; if(owned[p.i]) grpCt[p.g].done++; }
+  const assigned = Object.keys(owned).length;
+
+  $('statusChips').innerHTML = [
+    ['all','전체',PEOPLE.length], ['todo','미배정',PEOPLE.length - assigned], ['done','배정됨',assigned]
+  ].map(([v,l,n]) => `<button type="button" class="chip" data-s="${v}" aria-pressed="${fState === v}">${l} <small class="num">${n}</small></button>`).join('');
+
+  $('chips').innerHTML =
+    `<button type="button" class="chip" data-g="0" aria-pressed="${fGroup === 0}">모든 조</button>` +
+    GROUPS.map(g => `<button type="button" class="chip" data-g="${g.id}" aria-pressed="${fGroup === g.id}"><span class="sw" style="background:${g.color}"></span>${g.id}. ${g.name} <small class="num">${grpCt[g.id].done}/${grpCt[g.id].total}</small></button>`).join('');
+
+  const open = !gone(curBus);
+  $('rosterHint').textContent = !isAdmin
+    ? '이름 옆 번호가 배정된 차량과 번호입니다. 1-7은 1호차 7번입니다.'
+    : open
+      ? `미배정 이름 옆 칸에 번호를 넣고 배정을 누르세요. 7을 넣으면 ${curBus}-7로 배정됩니다.`
+      : `${curBus}호차는 출발했습니다. 위에서 배정할 호차를 고르세요.`;
+
+  const qf = fold(query.trim());
+  const rows = PEOPLE.filter(p =>
+    (!fGroup || p.g === fGroup) &&
+    (fState === 'all' || (fState === 'todo' ? !owned[p.i] : !!owned[p.i])) &&
+    (!qf || SEARCH[p.i].includes(qf)));
+
+  const parts = [];
+  if(fState !== 'all') parts.push(fState === 'todo' ? '미배정' : '배정됨');
+  if(fGroup) parts.push(`${fGroup}. ${GROUPS[fGroup-1].name}`);
+  if(qf) parts.push(`"${query.trim()}"`);
+  $('filterText').textContent = parts.length ? `${parts.join(', ')} 결과 ${rows.length}명` : `${rows.length}명`;
+  $('clearBtn').hidden = !parts.length;
+
+  if(!rows.length){
+    $('list').innerHTML = `<div class="empty-note">${fState === 'todo' && !qf && !fGroup ? '모든 사람이 배정되었습니다.' : '조건에 맞는 사람이 없습니다.<br>필터를 해제하거나 검색어를 바꿔 보세요.'}</div>`;
+    return;
+  }
+
+  let html = '', cg = null;
+  for(const p of rows){
+    if(p.g !== cg){
+      if(cg !== null) html += '</ul>';
+      const g = GROUPS[p.g-1];
+      html += `<div class="grp"><span class="sw" style="background:${g.color}"></span>${g.id}. ${g.name} <small class="num">${grpCt[g.id].done}/${grpCt[g.id].total}</small></div><ul>`;
+      cg = p.g;
+    }
+    const k = owned[p.i];
+    const meta = [p.r ? `<span class="role">${esc(p.r)}</span>` : '', esc(p.s)].filter(Boolean).join(' / ');
+    let right;
+    if(k){
+      const g = gone(busOf(k));
+      right = `<span class="done"><span class="tag num ${g ? 'gone' : 'on'}">${k}</span>${isAdmin && !g ? `<button type="button" class="cxl" data-cancel="${k}" aria-label="${esc(p.n)} ${k} 배정 취소">취소</button>` : ''}</span>`;
+    }else if(isAdmin && open){
+      right = `<span class="asgform"><label class="tnum"><span>${curBus}-</span><input class="tno" data-id="${p.i}" inputmode="numeric" enterkeyhint="done" autocomplete="off" maxlength="5" placeholder="번호" aria-label="${esc(p.n)} 번호 입력"></label><button type="button" class="asgbtn" data-asg="${p.i}">배정</button></span>`;
+    }else{
+      right = '<span class="tag off">미배정</span>';
+    }
+    html += `<li><div class="row${flashId === p.i ? ' flash' : ''}" data-id="${p.i}">
+      <span class="edge" style="background:${GROUPS[p.g-1].color}"></span>
+      <span class="who"><span class="nm">${esc(p.n)}</span>${meta ? `<span class="meta">${meta}</span>` : ''}<span class="err" id="err-${p.i}"></span></span>${right}</div></li>`;
+  }
+  $('list').innerHTML = html + '</ul>';
+  flashId = null;
+}
+
+function renderSeats(){
+  const b = curBus, c = countBus(b), g = gone(b);
+  $('busTitle').textContent = `${b}호차`;
+  $('busCount').textContent = c;
+  $('meterFill').style.width = (c / SEATS * 100) + '%';
+  $('meter').className = 'meter' + (g ? ' gone' : c === SEATS ? ' full' : '');
+  const st = $('busState');
+  if(g){ st.className = 'state'; st.textContent = `${hm(S.d[b])} 최종확인, 출발했습니다. 더 이상 수정할 수 없습니다.`; }
+  else if(c === SEATS){ st.className = 'state ready'; st.textContent = '44번까지 모두 찼습니다. 확인 후 최종확인을 누르세요.'; }
+  else if(c){ st.className = 'state go'; st.textContent = `배정 중, 빈 번호 ${SEATS - c}개`; }
+  else { st.className = 'state'; st.textContent = '아직 배정된 사람이 없습니다.'; }
+
+  let html = '';
+  for(let n = 1; n <= SEATS; n++){
+    const k = key(b,n), t = S.t[k];
+    if(n % 4 === 3) html += '<span aria-hidden="true"></span>';
+    const nm = t ? (byId[t.p]?.n || '') : '';
+    const cls = ['seat', t ? (g ? 'gone' : 'on') : (g ? 'gone empty' : 'empty')];
+    if(!t && !g && c > 0) cls.push('miss');
+    html += `<button type="button" class="${cls.join(' ')}" data-k="${k}" aria-label="${esc(t ? `${k} ${nm}` : `${k} 빈 번호`)}">
+      <b class="num">${k}</b><small>${t ? esc(nm) : (g ? '빈자리' : '&nbsp;')}</small></button>`;
+  }
+  $('seats').innerHTML = html;
+}
+
+function renderDock(){
+  document.body.classList.toggle('admin', isAdmin);
+  $('adminBtn').classList.toggle('on', isAdmin);
+  $('adminBtn').textContent = isAdmin ? '관리자 모드' : '관리자';
+  $('modeText').textContent = isAdmin ? '관리자 편집 중' : '보기 전용';
+  if(!isAdmin){ document.documentElement.style.setProperty('--dock','0px'); return; }
+
+  const b = curBus, c = countBus(b), g = gone(b), btn = $('departBtn'), sec = $('secBtn');
+  btn.className = 'depart';
+  sec.hidden = true;
+  if(saving){
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+    $('dockHint').textContent = '저장하는 중입니다. 잠시만 기다려 주세요.';
+  }else if(g){
+    btn.disabled = true; btn.classList.add('done');
+    btn.textContent = `${b}호차 출발 완료 (${hm(S.d[b])}, ${c}명)`;
+    sec.hidden = false; sec.textContent = '최종확인 해제'; sec.dataset.act = 'undepart';
+    $('dockHint').textContent = '최종확인된 차량은 수정할 수 없습니다.';
+  }else{
+    const em = emptyNums(b);
+    if(c === SEATS){
+      btn.disabled = false;
+      btn.textContent = `${b}호차 최종확인 후 출발 (${c}/${SEATS})`;
+      $('dockHint').innerHTML = `<b>${b}호차</b> 44명 배정 완료. 최종확인 전에는 명단에서 취소할 수 있습니다.`;
+    }else{
+      btn.disabled = true;
+      btn.textContent = `44번까지 모두 차면 최종확인 (${c}/${SEATS})`;
+      const list = em.slice(0, 8).join(', ') + (em.length > 8 ? ` 외 ${em.length - 8}개` : '');
+      $('dockHint').innerHTML = `<b>${b}호차</b> 빈 번호: ${list}`;
+      if(c > 0){ sec.hidden = false; sec.textContent = '인원 미달로 지금 최종확인'; sec.dataset.act = 'early'; }
+    }
+  }
+  requestAnimationFrame(() => document.documentElement.style.setProperty('--dock', $('dock').offsetHeight + 'px'));
+}
+
+let toastTimer;
+function toast(text){
+  $('toastText').textContent = text;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3500);
+}
+
+let modalDone = null;
+function openModal(html, onClick){
+  $('modal').innerHTML = html;
+  $('scrim').classList.add('show');
+  modalDone = { onClick };
+  setTimeout(() => ($('modal').querySelector('input') || $('modal').querySelector('button'))?.focus(), 30);
+}
+function closeModal(){ $('scrim').classList.remove('show'); $('modal').innerHTML = ''; modalDone = null; }
+$('scrim').addEventListener('click', e => { if(e.target === $('scrim')) closeModal(); });
+$('modal').addEventListener('click', e => {
+  const b = e.target.closest('button[data-a]'); if(!b || !modalDone) return;
+  if(b.dataset.a === 'close'){ closeModal(); return; }
+  modalDone.onClick && modalDone.onClick(b.dataset.a, b);
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && $('scrim').classList.contains('show')) closeModal(); });
+
+function whenClosed(res, val){
+  const obs = setInterval(() => { if(!$('scrim').classList.contains('show')){ clearInterval(obs); res(val); } }, 200);
+}
+function confirmBox({title, desc, ok, kind = 'primary'}){
+  return new Promise(res => {
+    openModal(`<h3>${esc(title)}</h3><p>${esc(desc)}</p>
+      <div class="acts"><button type="button" class="${kind}" data-a="ok">${esc(ok)}</button><button type="button" class="quiet" data-a="close">취소</button></div>`,
+      a => { if(a === 'ok'){ closeModal(); res(true); } });
+    whenClosed(res, false);
+  });
+}
+
+function stashUI(){
+  try{
+    sessionStorage.setItem('mdboard-ui', JSON.stringify({curBus, view, fGroup, fState, query}));
+  }catch(e){}
+}
+function restoreUI(){
+  try{
+    const raw = sessionStorage.getItem('mdboard-ui');
+    if(raw){
+      const u = JSON.parse(raw);
+      if(u.curBus) curBus = u.curBus;
+      if(u.view) view = u.view;
+      if(u.fGroup !== undefined) fGroup = u.fGroup;
+      if(u.fState) fState = u.fState;
+      if(u.query) query = u.query;
+      sessionStorage.removeItem('mdboard-ui');
+    }
+  }catch(e){}
+}
+
+async function mutate(applyFn, savingMsg){
+  if(!isAdmin || noStorage || saving) return false;
+  if(!artifactApi){ toast('저장 기능을 사용할 수 없습니다.'); return false; }
+  const snapshot = JSON.parse(JSON.stringify(S));
+  applyFn();
+  S.u = Date.now();
+  saving = true;
+  render();
+  if(savingMsg) toast(savingMsg);
+  setStatus('warn','저장 중');
+  stashUI();
+  try{
+    await artifactApi.publish(buildDocument(S));
+    setTimeout(() => { if(saving) location.reload(); }, 4000);
+  }catch(err){
+    saving = false;
+    S = snapshot;
+    const code = err && err.code;
+    if(code === 'not_writer' || code === 'not_granted'){
+      isAdmin = false;
+      try{ sessionStorage.removeItem('mdboard-admin'); }catch(e){}
+      toast('이 링크는 보기 전용입니다. 관리자만 수정할 수 있습니다.');
+    }else if(code === 'conflict'){
+      toast('다른 곳에서 방금 갱신되어 곧 새로고침됩니다.');
+    }else if(code === 'rate_limited'){
+      toast('너무 빠르게 저장했습니다. 잠시 후 다시 시도해 주세요.');
+    }else{
+      toast('저장에 실패했습니다. 다시 시도해 주세요.');
+    }
+    render();
+    okStatus();
+  }
+}
+
+function parseTicket(raw){
+  const s = raw.trim().replace(/번$/, '');
+  if(!s) return {err:'번호를 입력하세요.'};
+  let b, n, m;
+  if((m = s.match(/^(\d+)\s*[-.\s]\s*(\d+)$/))){ b = +m[1]; n = +m[2]; }
+  else if(/^\d+$/.test(s)){ b = curBus; n = +s; }
+  else return {err:'7 또는 1-7처럼 숫자로 입력하세요.'};
+  if(b < 1 || b > BUS_COUNT) return {err:`호차는 1~${BUS_COUNT} 사이여야 합니다.`};
+  if(n < 1 || n > SEATS) return {err:`번호는 1~${SEATS} 사이여야 합니다.`};
+  return {b, n};
+}
+
+function assign(id, raw){
+  const errEl = $('err-' + id);
+  const r = parseTicket(raw);
+  if(r.err){ errEl.textContent = r.err; return; }
+  const k = key(r.b, r.n);
+  if(gone(r.b)){ errEl.textContent = `${r.b}호차는 이미 출발했습니다.`; return; }
+  if(S.t[k]){ errEl.textContent = `${k}번은 이미 ${byId[S.t[k].p]?.n || '다른 사람'}에게 배정되어 있습니다.`; return; }
+  const mine = ownedMap()[id];
+  if(mine){ errEl.textContent = `이미 ${mine}번으로 배정되어 있습니다.`; return; }
+  const usedSearch = !!query.trim();
+  mutate(() => { S.t[k] = {at: Date.now(), p: id}; flashId = id; }, `${byId[id].n}, ${k}번 배정 저장 중`);
+  if(usedSearch){ query = ''; $('q').value = ''; }
+}
+
+function cancel(k){
+  const t = S.t[k]; if(!t || gone(busOf(k))) return;
+  mutate(() => { delete S.t[k]; flashId = t.p; }, `${byId[t.p]?.n || ''}, ${k}번 배정 취소 저장 중`);
+}
+
+function seatSheet(k){
+  const t = S.t[k]; if(!t) return;
+  const b = busOf(k), g = gone(b), p = byId[t.p];
+  const canEdit = isAdmin && !g;
+  const desc = `${p ? p.n : '-'}\n배정 시각 ${hms(t.at)}` + (g ? `\n${b}호차는 최종확인되어 수정할 수 없습니다.` : '');
+  openModal(`<h3>${esc(k)}번</h3><p>${esc(desc)}</p><div class="acts">
+      ${canEdit ? `<button type="button" class="danger" data-a="cancel">${esc(k)}번 배정 취소</button>` : ''}
+      <button type="button" class="quiet" data-a="close">닫기</button></div>`,
+    a => { if(a === 'cancel' && canEdit){ closeModal(); cancel(k); } });
+}
+
+async function depart(b, early){
+  const c = countBus(b);
+  let desc = `${b}호차 ${c}명을 최종확인하고 출발 처리합니다.\n최종확인 후에는 이 차량의 배정을 취소하거나 바꿀 수 없습니다.`;
+  if(early){
+    const em = emptyNums(b);
+    desc += `\n\n아직 ${em.length}개 번호가 비어 있습니다: ${em.slice(0,12).join(', ')}${em.length > 12 ? ' 등' : ''}`;
+  }
+  const ok = await confirmBox({ title: early ? `${b}호차 인원 미달 최종확인` : `${b}호차 최종확인`, desc, ok: early ? `${c}명으로 출발` : '최종확인, 출발' });
+  if(!ok || gone(b)) return;
+  mutate(() => {
+    S.d[b] = Date.now();
+    const nxt = BUSES.find(x => x > b && !gone(x)) || firstOpenBus();
+    if(nxt) curBus = nxt;
+  }, `${b}호차 출발 처리를 저장하는 중입니다.`);
+}
+
+$('adminBtn').onclick = async () => {
+  if(isAdmin) return;
+  if(noStorage){ toast('이 환경에서는 저장 기능을 사용할 수 없어 관리자 모드를 쓸 수 없습니다.'); return; }
+  const ok = await confirmBox({
+    title:'관리자 모드로 전환',
+    desc:'관리자 모드에서는 번호 배정과 출발 확인을 저장할 수 있습니다.\n이 페이지를 수정할 권한이 있는 경우에만 저장되며, 권한이 없으면 첫 시도에서 자동으로 보기 전용으로 돌아갑니다.',
+    ok:'관리자 모드로 전환', kind:'dark'
+  });
+  if(!ok) return;
+  isAdmin = true;
+  try{ sessionStorage.setItem('mdboard-admin','1'); }catch(e){}
+  okStatus(); render();
+};
+$('logoutBtn').onclick = () => {
+  isAdmin = false;
+  try{ sessionStorage.removeItem('mdboard-admin'); }catch(e){}
+  okStatus(); render(); toast('보기 전용으로 전환했습니다.');
+};
+$('refreshBtn').onclick = () => location.reload();
+
+$('resetBtn').onclick = async () => {
+  const ok = await confirmBox({ title:'전체 초기화', desc:'모든 번호 배정과 최종확인 기록을 지웁니다.\n링크로 보는 모든 사람의 화면에도 반영되며 되돌릴 수 없습니다.', ok:'모두 지우기', kind:'dark' });
+  if(!ok) return;
+  mutate(() => { S.t = {}; S.d = {}; curBus = 1; }, '전체 초기화를 저장하는 중입니다.');
+};
+
+$('buses').addEventListener('click', e => {
+  const b = e.target.closest('.btab'); if(!b) return;
+  curBus = +b.dataset.b;
+  render();
+});
+document.querySelector('.views').addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]'); if(!b) return;
+  view = b.dataset.v; render();
+});
+
+$('list').addEventListener('click', e => {
+  if(!isAdmin) return;
+  const a = e.target.closest('[data-asg]');
+  if(a){ const inp = document.querySelector(`.tno[data-id="${a.dataset.asg}"]`); assign(a.dataset.asg, inp.value); return; }
+  const c = e.target.closest('[data-cancel]');
+  if(c) cancel(c.dataset.cancel);
+});
+$('list').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && e.target.classList.contains('tno')){ e.preventDefault(); assign(e.target.dataset.id, e.target.value); }
+});
+$('list').addEventListener('input', e => {
+  if(e.target.classList.contains('tno')){ const el = $('err-' + e.target.dataset.id); if(el) el.textContent = ''; }
+});
+
+$('seats').addEventListener('click', e => {
+  const s = e.target.closest('.seat'); if(!s) return;
+  if(S.t[s.dataset.k]) seatSheet(s.dataset.k);
+  else if(isAdmin && !gone(curBus)) toast('명단에서 이름 옆에 번호를 입력해 배정하세요.');
+});
+
+$('statusChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  fState = b.dataset.s; render();
+});
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  const g = +b.dataset.g; fGroup = fGroup === g ? 0 : g; render();
+});
+let qTimer;
+$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { query = e.target.value; render(); }, 120); });
+$('clearBtn').onclick = () => { fGroup = 0; fState = 'all'; query = ''; $('q').value = ''; render(); };
+
+$('departBtn').onclick = () => { if(isAdmin && countBus(curBus) === SEATS && !gone(curBus) && !saving) depart(curBus, false); };
+$('secBtn').onclick = async () => {
+  if(!isAdmin || saving) return;
+  const b = curBus;
+  if($('secBtn').dataset.act === 'early' && !gone(b)){ depart(b, true); return; }
+  if($('secBtn').dataset.act === 'undepart' && gone(b)){
+    const ok = await confirmBox({ title:`${b}호차 최종확인 해제`, desc:'실수로 최종확인을 눌렀을 때만 사용하세요.\n해제하면 이 차량의 배정을 다시 수정할 수 있습니다.', ok:'최종확인 해제', kind:'dark' });
+    if(!ok) return;
+    mutate(() => { delete S.d[b]; }, `${b}호차 최종확인 해제를 저장하는 중입니다.`);
+  }
+};
+
+window.addEventListener('resize', () => isAdmin && renderDock());
+
+(async function init(){
+  const stateEl = document.getElementById('state-data');
+  if(stateEl){
+    try{ const d = JSON.parse(stateEl.textContent); S = {t: d.t || {}, d: d.d || {}, u: d.u || 0}; }catch(e){}
+  }
+  restoreUI();
+  $('q').value = query;
+  render();
+
+  artifactApi = (window.claude && window.claude.use) ? await window.claude.use('artifact') : null;
+  noStorage = !artifactApi;
+
+  let wasAdmin = false;
+  try{ wasAdmin = sessionStorage.getItem('mdboard-admin') === '1'; }catch(e){}
+  isAdmin = !noStorage && wasAdmin;
+
+  if(!curBus || (gone(curBus) && firstOpenBus())) { const f = firstOpenBus(); if(f) curBus = f; }
+  render();
+  okStatus();
+})();
+</script>
+</body>
+</html>
