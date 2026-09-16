@@ -6,7 +6,6 @@ import BusTabs from './components/BusTabs.jsx';
 import ViewTabs from './components/ViewTabs.jsx';
 import RosterView from './components/RosterView.jsx';
 import SeatView from './components/SeatView.jsx';
-import AdminDock from './components/AdminDock.jsx';
 import Toast from './components/Toast.jsx';
 import ConfirmModal from './components/ConfirmModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
@@ -314,7 +313,7 @@ export default function App() {
           sumGone={sumGone}
           statusKind={statusKind}
           statusText={statusText}
-          onAdminClick={() => (isAdmin ? null : setLoginOpen(true))}
+          onAdminClick={() => (isAdmin ? handleLogout() : setLoginOpen(true))}
           onRefresh={() => window.location.reload()}
         />
 
@@ -352,21 +351,8 @@ export default function App() {
         )}
       </div>
 
-      {isAdmin && (
-        <AdminDock
-          curBus={curBus}
-          seats={roster.seats}
-          t={t}
-          d={d}
-          saving={saving}
-          departEnabled={roster.departEnabled}
-          onDepart={(bus) => handleDepart(bus, false)}
-          onEarlyDepart={(bus) => handleDepart(bus, true)}
-          onUndepart={handleUndepart}
-          onReset={handleReset}
-          onLogout={handleLogout}
-        />
-      )}
+      {/* Bottom admin toolbar (전체초기화/나가기/최종확인) hidden for now --
+          logging out is available from the header's "관리자 모드" button. */}
 
       <Toast text={toastText} />
       <ConfirmModal state={confirmState} onClose={closeConfirm} />
