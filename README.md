@@ -29,7 +29,7 @@ npm run dev         # http://localhost:5173 (자동으로 /api 요청을 4000번
 
 ## 데이터 모델
 
-- `server/src/data/roster.js` — 명단(306명)·조 색상(8개)·버스 수(8)·좌석 수(44). 인원이 바뀌면 이 파일만 고치면 됩니다.
+- `server/src/data/roster.js` — 명단(311명)·조 색상(8개)·버스 수(8)·좌석 수(44). 인원이 바뀌면 이 파일만 고치면 됩니다.
 - `server/data/board.db` — SQLite. 배정(`assignments`)과 출발(`departures`) 기록. 서버 실행 중 자동 생성됩니다.
 - `server/data/admin.json` — 관리자 비밀번호의 bcrypt 해시. 최초 실행 시 `.env`의 `ADMIN_PASSWORD`로 한 번 생성되고, 그 뒤로는 이 파일이 진실의 원천입니다. 비밀번호를 바꾸려면 이 파일을 지우고 `.env`의 `ADMIN_PASSWORD`를 새 값으로 바꾼 뒤 재시작하세요.
 
@@ -79,4 +79,4 @@ sudo certbot --nginx -d your-domain.example
 ## 알려진 사항
 
 - `npm audit`이 `vite`/`esbuild`에 대해 경고를 띄울 수 있는데, 이는 **개발 서버**(`vite dev`)에만 해당하는 이슈입니다. 배포본은 `npm run build`로 만든 정적 파일을 nginx가 서빙하므로 영향이 없습니다.
-- 참석자 238명의 실명(일부 성별 정보 포함)이 `server/src/data/roster.js`와 `index.html`에 그대로 들어 있습니다. 이 저장소를 공개로 전환하거나 다른 사람과 공유하기 전에 이 점을 고려해 주세요.
+- 참석자 311명의 실명(일부 성별 정보 포함)이 `server/src/data/roster.js`와 `index.html`에 그대로 들어 있습니다. 이 저장소를 공개로 전환하거나 다른 사람과 공유하기 전에 이 점을 고려해 주세요.
