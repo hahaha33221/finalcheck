@@ -142,6 +142,8 @@ export default function App() {
           toast('이미 출발한 차량입니다.');
         } else if (err.code === 'already_assigned') {
           toast('이미 다른 번호로 배정되어 있습니다.');
+        } else if (err.code === 'depart_disabled') {
+          toast('최종확인 기능이 꺼져 있습니다.');
         } else {
           toast('저장에 실패했습니다. 다시 시도해 주세요.');
         }
@@ -357,6 +359,7 @@ export default function App() {
           t={t}
           d={d}
           saving={saving}
+          departEnabled={roster.departEnabled}
           onDepart={(bus) => handleDepart(bus, false)}
           onEarlyDepart={(bus) => handleDepart(bus, true)}
           onUndepart={handleUndepart}

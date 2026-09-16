@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { countBus, emptyNums, hm } from '../utils.js';
 
-export default function AdminDock({ curBus, seats, t, d, saving, onDepart, onEarlyDepart, onUndepart, onReset, onLogout }) {
+export default function AdminDock({ curBus, seats, t, d, saving, departEnabled, onDepart, onEarlyDepart, onUndepart, onReset, onLogout }) {
   const dockRef = useRef(null);
   const c = countBus(t, curBus, seats);
   const departed = !!d[curBus];
@@ -12,7 +12,10 @@ export default function AdminDock({ curBus, seats, t, d, saving, onDepart, onEar
   let hint;
   let secButton = null;
 
-  if (saving) {
+  if (!departEnabled && !departed) {
+    departText = '최종확인 기능 꺼짐';
+    hint = '명단을 계속 수정할 수 있도록 최종확인(출발 확정)을 잠시 꺼두었습니다.';
+  } else if (saving) {
     departText = '저장 중...';
     hint = '저장하는 중입니다. 잠시만 기다려 주세요.';
   } else if (departed) {

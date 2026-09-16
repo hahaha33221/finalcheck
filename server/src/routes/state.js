@@ -6,6 +6,11 @@ import { PEOPLE, GROUPS, BUS_COUNT, SEATS } from '../data/roster.js';
 
 export const stateRouter = Router();
 
+// Off by default while the roster is still being set up/edited -- flip
+// DEPART_ENABLED=true in server/.env (then restart the service) once the
+// team is ready to start locking buses as they leave.
+const DEPART_ENABLED = process.env.DEPART_ENABLED === 'true';
+
 const peopleById = new Set(PEOPLE.map((p) => p.i));
 const seatKeyRe = /^([1-9]\d*)-([1-9]\d*)$/;
 
@@ -29,7 +34,7 @@ stateRouter.get('/state', (req, res) => {
 });
 
 stateRouter.get('/roster', (req, res) => {
-  res.json({ groups: GROUPS, people: PEOPLE, busCount: BUS_COUNT, seats: SEATS });
+  res.json({ groups: GROUPS, people: PEOPLE, busCount: BUS_COUNT, seats: SEATS, departEnabled: DEPART_ENABLED });
 });
 
 stateRouter.post('/assign', requireAdmin, (req, res) => {
@@ -52,6 +57,7 @@ stateRouter.post('/cancel', requireAdmin, (req, res) => {
 });
 
 stateRouter.post('/depart', requireAdmin, (req, res) => {
+  if (!DEPART_ENABLED) return res.status(403).json({ error: 'depart_disabled' });
   const bus = Number(req.body && req.body.bus);
   if (!Number.isInteger(bus) || bus < 1 || bus > BUS_COUNT) {
     return res.status(400).json({ error: 'bad_bus' });
